@@ -183,7 +183,7 @@ def build_packages():
                                     mailer.check("<BR>".join(out.split("\n")), pspec, "checkelf output for %s" % name)
                                     logger.info("Missing dependencies: %s" % ",".join(missing))
                                     missing_deps_packages[package_name] = missing
-                                    qmgr.addToWaitQueue(pspec)
+                                    qmgr.transferToWaitQueue(pspec)
                                 open(checkfile, "a" if os.path.exists(checkfile) else "w").write(out)
                 finally:
                     # Unmount tmp_dir if any
