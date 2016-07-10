@@ -4,7 +4,7 @@ TODO for buildfarm 3.0
 (+) Install buildfarm modules into python' sitearch and make them importable
 (+) Use configuration file instead of config.py which is imported
 (+) Move standalone scripts under scripts/
-(+) Grab Pardus version from pisi.conf to be more flexible
+(+) Grab Pisi Linux version from pisi.conf to be more flexible
 (+) Support for sandbox blacklist
 (+) Make repomanager a separate executable buildfarm-up
 (+) Consolidate buildfarm directories to not conflict with pisi

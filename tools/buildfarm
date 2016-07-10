@@ -4,30 +4,55 @@
 import sys
 import subprocess
 
-COMMANDS_NOPARAM = [
-                        "init",
-                        "up",
-                        "run",
-                        "missing",
-                   ]
+COMMANDS = {
+                           "init": "Initializes a new buildfarm environment",
+                           "up": "Checks out the repository from remote SCM",
+                           "missing": "Dumps the packages which has releases not built yet",
+                           "circle": "Checks circle dependencies",
+                           "--version": "Prints the version\n",
+                           "add": "Adds components or packages to work queue#",
+                           "run": "Build and install packages#",
+                           "clean": "cleans specified waitqueue and/or workqueue files"
+           }
 
-COMMANDS_WITH_ONEPARAM = []
+ADD = {
+                "-r": "reset queues", 
+                "-w": "write to work queue",
+                "-c": "add components to work queue", 
+                "-p": "add packages to work queue",
+                "-d": "don't add build and runtime dependencies",
+                "-D": "don't add runtime dependencies", 
+                "-x": "update local repo index",
+                "-s": "skip already compiled packages"
+       }
+
+RUN = {
+                "-b": "resolv build deps only",
+                "-f": "force to overwrite packages",
+                "-r": "use workqueue-release"
+       }
+
+def print_help (commands):
+    longest_name = len(max(commands, key=len))        
+    for cmd in sorted(commands, key=lambda x: x[0]):
+        if commands[cmd].endswith('#'): 
+            print "    %s%s - %s" % (" " * (longest_name - len(cmd)), cmd, commands[cmd][:-1])
+            print "       %sOptions:" % (" " * longest_name)
+            for opt in sorted(eval(cmd.upper()), key=lambda x: x[1]):
+                 print "       %s%s %s" % ((" " * longest_name), opt, eval(cmd.upper())[opt])
+        else: print "    %s%s - %s" % (" " * (longest_name - len(cmd)), cmd, commands[cmd])
 
 def usage():
     print """\
-Pardus buildfarm framework
+Pisilinux buildfarm framework
 
-Usage: %s COMMAND
+Usage: %s COMMAND [OPTIONS] [PARAMS]
     Where COMMAND can be one of the following:
-
-    init        Initializes a new buildfarm environment
-    up          Checks out the repository from remote SCM
-    run         Build and install packages
-    missing     Dumps the packages which has releases not
-                built yet.
-
-    --version   Prints the version
 """ % sys.argv[0]
+    print_help(COMMANDS)
+
+    print
+
     return 1
 
 if __name__ == "__main__":
@@ -36,14 +61,15 @@ if __name__ == "__main__":
         sys.exit(usage())
 
     cmd = sys.argv[1]
+    args = sys.argv[2:]
 
     # Handle the version in here for simplicity
     if cmd == "--version":
         import buildfarm
         print "Version: %s" % buildfarm.__version__
 
-    elif cmd in COMMANDS_NOPARAM:
-        sys.exit(subprocess.call(["buildfarm-%s" % cmd]))
+    elif cmd in COMMANDS:
+        sys.exit(subprocess.call(["buildfarm-%s" % cmd] + args))
     else:
         sys.exit(usage())
 

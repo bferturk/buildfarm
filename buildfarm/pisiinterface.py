@@ -58,8 +58,9 @@ class PisiApi:
 
     def close(self):
         pisi.api.ctx.ui.flush_logs()
+        pisi.api.ctx.filesdb = None
 
-    def build(self, pspec):
+    def build(self, pspec, ignore_dep = False):
         if not os.path.exists(pspec):
             logger.error("'%s' does not exist." % pspec)
 
@@ -68,6 +69,7 @@ class PisiApi:
             logger.info("Disabling sandbox for %s" % pspec)
             pisi.api.ctx.set_option("ignore_sandbox", True)
 
+        pisi.api.ctx.set_option("ignore_dependency", ignore_dep)
         logger.info("Building %s" % pspec)
         self.builder = pisi.operations.build.Builder(pspec)
 
@@ -91,7 +93,9 @@ class PisiApi:
 
         logger.info("Created package(s): %s" % self.builder.new_packages)
 
-    def install(self, pkgs):
+    def install(self, pkgs, ignore_dep = False):
+        pisi.api.ctx.set_option("ignore_dependency", ignore_dep)
+        pisi.api.ctx.set_option("store_lib_info", True)
         pisi.api.install(pkgs, ignore_file_conflicts=self.options.ignore_file_conflicts,
                                ignore_package_conflicts=self.options.ignore_package_conflicts,
                                reinstall=True)

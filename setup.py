@@ -25,14 +25,14 @@ HOOKS = glob.glob("hooks/*")
 
 setup(name="buildfarm",
       version=buildfarm.__version__,
-      description="Pardus Buildfarm",
-      long_description="A buildfarm framework which builds source packages for Pardus",
+      description="Pisi Linux Buildfarm",
+      long_description="A buildfarm framework which builds source packages for Pisi Linux",
       author="Ozan Çağlayan",
       author_email="ozan@pardus.org.tr",
-      url="http://svn.pardus.org.tr/uludag/trunk/buildfarm",
+      url="http://github.com/pisilinux",
       license="GPLv2",
       platforms=["Linux"],
       packages=["buildfarm"],
       scripts=TOOLS,
-      data_files=[("/etc/buildfarm", ["data/buildfarm.conf", "data/auth.conf"]),
+      data_files=[("/etc/buildfarm", ["data/buildfarm.conf", "data/auth.conf", "data/circle.conf", "data/no-r.list"]),
                    ("/etc/buildfarm/hooks.d", HOOKS)])

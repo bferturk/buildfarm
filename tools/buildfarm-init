@@ -11,7 +11,7 @@
 # Please read the COPYING file.
 #
 
-import os
+import os,commands
 
 from buildfarm.config import configuration as conf
 from buildfarm import utils
@@ -33,10 +33,10 @@ def check_config():
         return True
 
 def setup_repository():
-    remote_url = utils.get_remote_repository_url()
-    local_url = utils.get_local_repository_url()
-
     if conf.scm == "svn":
+        utils.create_directories()
+        remote_url = utils.get_remote_repository_url()
+        local_url  = utils.get_local_repository_url()
         if os.system("svn info %s &> /dev/null" % local_url) > 0:
             os.chdir(local_url)
             print "%s will be checked out into %s" % (remote_url, local_url)
@@ -44,9 +44,26 @@ def setup_repository():
         else:
             print "%s is checked out, skipping." % local_url
 
+    # git deposundan dosya indirme özelliği sadece github altında denenmiştir.
+    if conf.scm == "git":
+        utils.create_directories() 
+        remote_url = utils.get_remote_repository_url()
+        local_url  = utils.get_local_repository_url()
+        local_git  = utils.get_local_git_repository_url()
+        if os.path.isdir("%s/.git" % local_git):
+            print "%s/.git already exists." % local_git
+        else:
+            oldwd = os.getcwd()
+            if os.path.isdir(local_git): os.system("rm -Rf %s" % local_git)
+            os.chdir(os.path.dirname(local_git))
+            print "%s will be checked out into %s" % (remote_url, local_git)
+            os.system("git clone %s %s" % (remote_url, local_git))
+            os.system("rm -Rf %s/*" % local_url)
+            os.chdir(local_git)
+            os.system("cp -Rfp ./* %s" % local_url)
+            os.system("rm -Rf %s/.git" % local_url)
+            os.chdir(oldwd)
+                   
 if __name__ == "__main__":
     if check_config():
-        utils.create_directories()
         setup_repository()
-
-

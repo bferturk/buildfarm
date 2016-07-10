@@ -1,3 +1,6 @@
+2013-05-05 Marcin Bojara <marcin_at_pisilinux.org>
+	New script buildfarm-add
+
 2010-04-01 Ozan Çağlayan <ozan_at_pardus.org.tr>
 	* (buildfarm/repomanager.py): Remove reverseDependencyUpdate checking as
 	maintainers *should* always write strict dependencies to the new library

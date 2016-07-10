@@ -35,8 +35,8 @@ The last 50 lines of the log before the error happens is as follows:
 %(message)s
 --------------------------------------------------------------------------
 
-Plain log file: http://packages.pardus.org.tr/logs/%(logsdir)s/%(logfilename)s.log
-Fancy log file: http://packages.pardus.org.tr/logs/%(logsdir)s/%(logfilename)s.html
+Plain log file: http://farm.pisilinux.org/farm-logs/%(logsdir)s/%(logfilename)s.log
+Fancy log file: http://farm.pisilinux.org/farm-logs/%(logsdir)s/%(logfilename)s.html
 
 --boundary42
 Content-Type: text/html;
@@ -63,9 +63,11 @@ The last 50 lines of the log before the error happens is as follows:
 
 <p>
 Plain log file:
-<a href="http://packages.pardus.org.tr/logs/%(logsdir)s/%(logfilename)s.log">http://packages.pardus.org.tr/logs/%(logsdir)s/%(logfilename)s.log</a><br>
+<a 
+href="http://farm.pisilinux.org/farm-logs/%(logsdir)s/%(logfilename)s.log">http://farm.pisilinux.org/farm-logs%(logsdir)s/%(logfilename)s.log</a><br>
 Fancy log file:
-<a href="http://packages.pardus.org.tr/logs/%(logsdir)s/%(logfilename)s.html">http://packages.pardus.org.tr/logs/%(logsdir)s/%(logfilename)s.html</a>
+<a 
+href="http://farm.pisilinux.org/farm-logs/%(logsdir)s/%(logfilename)s.html">http://farm.pisilinux.org/farm-logs%(logsdir)s/%(logfilename)s.html</a>
 </p>
 
 <br>
@@ -85,9 +87,27 @@ Content-Type: text/plain;
 
 Hello,
 
-This message is sent from Pardus buildfarm. Please do not reply as it is automatically generated.
+This message is sent from Pisi Linux buildfarm. Please do not reply as it is automatically generated.
 
 %(message)s
+
+"""
+
+## Check info
+
+CHECK_MESSAGE = """\
+From: %(distribution)s %(release)s %(arch)s Buildfarm <%(mailFrom)s>
+To: %(mailToUpdater)s
+Cc: %(ccList)s
+Subject: [%(subjectID)s] %(subject)s
+Content-Type: text/html;
+            charset="utf-8"
+
+Hello,
+<BR><BR>
+This message is sent from Pisi Linux buildfarm. Please do not reply as it is automatically generated.
+<BR>
+<pre><font face="monospace">%(message)s</font></pre>
 
 """
 
@@ -102,7 +122,7 @@ Content-Type: text/plain;
 
 Hello,
 
-This message is sent from Pardus buildfarm. Please do not reply as it is automatically generated.
+This message is sent from Pisi Linux buildfarm. Please do not reply as it is automatically generated.
 
 %(message)s
 
@@ -113,4 +133,6 @@ ALL =  {
          'error'     : ERROR_MESSAGE,
          'announce'  : ANNOUNCE_MESSAGE,
          'info'      : INFO_MESSAGE,
+         'check'      : CHECK_MESSAGE
        }
+

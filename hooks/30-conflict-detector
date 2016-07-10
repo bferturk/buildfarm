@@ -15,7 +15,7 @@ Subject: [%(subjectID)s] Package Conflict Status
 Content-Type: text/plain;
             charset="utf-8"
 
-Dear Pardus contributors,
+Dear Pisi Linux contributors,
 
 You are probably receiving this e-mail because some of your packages ships
 files that conflicts with other packages. Below is the list of those packages
@@ -23,11 +23,11 @@ along with the list of conflicting files:
 
 %(conflicts)s
 
-Please fix these conflicts as soon as possible to keep Pardus repositories
+Please fix these conflicts as soon as possible to keep Pisi Linux repositories
 as consistent as possible.
 
 Thanks
-Pardus Buildfarm
+Pisi Linux Buildfarm 
 
 """
 

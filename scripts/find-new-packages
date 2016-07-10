@@ -27,7 +27,7 @@ class UpdateInfo:
         self.comment = package.history[0].comment.splitlines()[0][:40]
         if self.comment != package.history[0].comment:
             self.comment += "..."
-
+        #FIXME url
         self.url = "http://packages.pardus.org.tr/info/%s/testing/source/%s.html" % (utils.get_distribution_release(),
                                                                                      self.name)
 

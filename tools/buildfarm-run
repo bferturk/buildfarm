@@ -13,21 +13,35 @@
 import os
 os.environ["LC_ALL"] = "C"
 
+import re
 import sys
 import copy
 import shutil
 import traceback
 import cStringIO
+import subprocess
 
 import pisi.context as ctx
 import pisi.api
+import pisi.util
 from pisi.file import File
+from pisi.specfile import SpecFile
+from pisi.db.packagedb import PackageDB
 
 from buildfarm import logger, mailer, queuemanager, pisiinterface, utils
 from buildfarm.config import configuration as conf
 
+MAIN = "testing"
+NO = "\x1b[0;0m"
+RD = "\x1b[31;01m"
+
 def build_packages():
-    qmgr = queuemanager.QueueManager()
+    built_packages = {}
+    missing_deps_packages = {}
+    if not os.path.exists(os.path.join(utils.get_package_log_directory(), "check")):
+        os.makedirs(os.path.join(utils.get_package_log_directory(), "check"))
+
+    qmgr = queuemanager.QueueManager(rdresolv = not options["b"], release = options["r"])
 
     qmgr.transfer_all_packages_to_work_queue()
     queue = copy.copy(qmgr.get_work_queue())
@@ -40,6 +54,7 @@ def build_packages():
     home_dir = os.environ["HOME"]
 
     package_list = []
+    ignored_package_list = []
 
     # Compiling current work queue
 
@@ -52,64 +67,134 @@ def build_packages():
     mailer.info("I'm starting to compile packages in the following order:\n\n%s" % "\n".join(stripped_work_queue))
     logger.raw()
 
-    for pspec in queue:
+    pdb = PackageDB()
+    #main_packages = pdb.list_packages(MAIN)
+
+    for qline in queue:
         #utils.mount_tmpfs()
+        remove_checkfile = True
 
-        package_name = utils.get_package_name_from_path(pspec)
-        package_name_with_component = utils.get_package_component_path(pspec)
-        logfile = os.path.join(utils.get_package_log_directory(),
-                               utils.get_package_logfile_name(pspec))
-        build_output = open(logfile, "w")
-        logger.raw()
+        circle = False if len(qline.split()) == 1 else True
+        for pass_ in range (1 if circle else 2, 3):
+            for pspec in qline.split():
+                package_name = utils.get_package_name_from_path(pspec)
+                package_name_with_component = utils.get_package_component_path(pspec)
+                logfile = os.path.join(utils.get_package_log_directory(),
+                                       utils.get_package_logfile_name(pspec))
+                checkfile = os.path.join(utils.get_package_log_directory(),
+                                         "check",
+                                         utils.get_package_logfile_name(pspec))
 
-        log_msg = "Building %s (%d/%d)" % (package_name, int(queue.index(pspec)+1), len(queue))
-        logger.info(log_msg)
+                spec = SpecFile(pspec)
+                try:
+                    mpkg_ver, mpkg_rel = pdb.get_version_and_distro_release(package_name, MAIN)[:2]
+                    if spec.history[0].version == mpkg_ver and spec.history[0].release == mpkg_rel:
+                        logger.raw()
+                        logger.info("%s-%s-%s exists in the main repo!" % (package_name, mpkg_ver, mpkg_rel))
+                        mailer.info("%s-%s-%s exists in the main repo!" % (package_name, mpkg_ver, mpkg_rel),
+                                    "%s cannot be built." % package_name_with_component)
+                        qmgr.removeFromWorkQueue(pspec)
+                        ignored_package_list.append(package_name_with_component)
+                        if not package_list and not qmgr.workQueue: return
+                        break
+                except Exception:
+                    pass
+                
+                if remove_checkfile and os.path.exists(checkfile):
+                    os.remove(checkfile)
+                    remove_checkfile = False
+                build_output = open(logfile, "w")
+                logger.raw()
+        
+                log_msg = "Building %s (%d%s/%d)%s" % (package_name,
+                                                       int(queue.index(qline)+1) if circle else int(queue.index(pspec)+1),
+                                                       chr(range( ord('a'), ord('z') + 1)[qline.split().index(pspec)]) if circle else "",
+                                                       len(queue),
+                                                       " pass %d" % pass_ if circle else "")
+                logger.info(log_msg)
+        
+                # This is here because farm captures the build output
+                pisi_api = pisiinterface.PisiApi(stdout = build_output,
+                                                 stderr = build_output,
+                                                 output_dir = conf.workdir)
+                try:
+                    # First let's build the package
+                    pisi_api.build(pspec, ignore_dep=pass_ == 1)
 
-        # This is here because farm captures the build output
-        pisi_api = pisiinterface.PisiApi(stdout = build_output,
-                                         stderr = build_output,
-                                         output_dir = conf.workdir)
-        try:
-            # First let's build the package
-            pisi_api.build(pspec)
+                    # These lists contain full path to the .pisi files
+                    new_binary_packages = pisi_api.get_new_packages()
+                    new_debug_packages = pisi_api.get_new_debug_packages()
+        
+                    # Get the dictionary of delta packages (a-b-c.pisi -> a-b-c-d.delta.pisi)
+                    new_delta_packages = pisi_api.get_delta_package_map()
+        
+                    # Build was successful, let's install the packages
+                    pisi_api.install(new_binary_packages, ignore_dep=(options["b"] or pass_ == 1))
+        
+                except Exception, e:
+                    # Finalize api to generate logs
+                    pisi_api.close()
+        
+                    # Transfer source package to wait queue in case of a build error
+                    qmgr.transferToWaitQueue(pspec)
+        
+                    # Cleanup possibly built .pisi packages
+                    utils.delete_pisi_files_from(conf.workdir)
+        
+                    errmsg = "Error occurred in package %s:\n %s" % (package_name_with_component, e)
+                    logger.error(errmsg)
+                    mailer.error(e, pspec)
+                else:
+                    # Installation was successful
+                    pisi_api.close()
+                    if not pass_ == 1:
+                        if not circle: qmgr.removeFromWorkQueue(pspec)
+                        else:
+                            if qline.endswith(pspec): qmgr.removeFromWorkQueue(qline)
+                        built_packages[package_name] = (new_binary_packages, new_debug_packages, new_delta_packages)
+                        package_list += [os.path.basename(pkg) for pkg in new_binary_packages]
 
-            # These lists contain full path to the .pisi files
-            new_binary_packages = pisi_api.get_new_packages()
-            new_debug_packages = pisi_api.get_new_debug_packages()
-
-            # Get the dictionary of delta packages (a-b-c.pisi -> a-b-c-d.delta.pisi)
-            new_delta_packages = pisi_api.get_delta_package_map()
-
-            # Build was successful, let's install the packages
-            pisi_api.install(new_binary_packages)
-
-        except Exception, e:
-            # Finalize api to generate logs
-            pisi_api.close()
-
-            # Transfer source package to wait queue in case of a build error
-            qmgr.transferToWaitQueue(pspec)
-
-            # Cleanup possibly built .pisi packages
-            utils.delete_pisi_files_from(conf.workdir)
-
-            errmsg = "Error occurred in package %s:\n %s" % (package_name_with_component, e)
-            logger.error(errmsg)
-            mailer.error(e, pspec)
-        else:
-            # Installation was successful
-            pisi_api.close()
-            qmgr.removeFromWorkQueue(pspec)
-            move_packages(new_binary_packages, new_debug_packages, new_delta_packages)
-            package_list += [os.path.basename(pkg) for pkg in new_binary_packages]
-        finally:
-            # Unmount tmp_dir if any
-            # utils.umount_tmpfs()
-            pass
+                        for pkg in new_binary_packages:
+                            name = pisi.util.parse_package_name(os.path.basename(pkg))[0]
+                            if re.search("-docs?$", name) or \
+                                         "-i18n-" in name or \
+                                         "-l10n-" in name:
+                                continue
+                            logger.info("Running checkelf for: %s" % name)
+                            p = subprocess.Popen(["checkelf", "-ns" if utils.get_package_component_path(pspec).startswith("system/base") else "-n", name],
+                                                 stdout=subprocess.PIPE,
+                                                 stderr=subprocess.PIPE)
+                            out, err = p.communicate()
+                            if err:
+                                mailer.check("<BR>".join(err.split("\n")), pspec, "checkelf error for %s" % name)
+                                open(checkfile, "w").write(err)
+                            else:
+                                missing = []
+                                missing_index = -1
+                                for chline in out.split("\n"):
+                                    if not missing_index == -1:
+                                        if not "---" in chline:
+                                            missing_dep = chline[missing_index:].strip() 
+                                            if missing_dep and not missing_dep.startswith("glibc"):
+                                                missing.append(missing_dep)
+                                        continue 
+                                    missing_index = chline.find("Missing dependencies")
+                                if missing:
+                                    mailer.check("<BR>".join(out.split("\n")), pspec, "checkelf output for %s" % name)
+                                    logger.info("Missing dependencies: %s" % ",".join(missing))
+                                    missing_deps_packages[package_name] = missing
+                                    qmgr.addToWaitQueue(pspec)
+                                open(checkfile, "a" if os.path.exists(checkfile) else "w").write(out)
+                finally:
+                    # Unmount tmp_dir if any
+                    # utils.umount_tmpfs()
+                    pass
 
     # Use a/b/pspec.xml instead of full path in e-mails
     stripped_wait_queue = [utils.get_package_component_path(pkg) for pkg in qmgr.get_wait_queue()]
 
+    if ignored_package_list:
+        mailer.info("\n".join(ignored_package_list), "Auto ignored packages")
     if stripped_wait_queue:
         logger.info("Wait Queue: %s" % stripped_wait_queue)
         mailer.info("Queue finished with problems and those packages couldn't be compiled:\n\n%s\n\n\nNew binary packages are;\n\n%s\n\nnow in repository" % ("\n".join(stripped_wait_queue), "\n".join(package_list)))
@@ -119,10 +204,53 @@ def build_packages():
     logger.raw()
 
     # Remove obsoleted packages
-    logger.info("Removing obsoleted packages, this may take a while..")
-    removed_packages = utils.remove_obsoleted_packages()
-    if removed_packages:
-        logger.info("Removed the following obsoleted packages:\n%s" % "\n".join(removed_packages))
+    #logger.info("Removing obsoleted packages, this may take a while..")
+    # removed_packages = utils.remove_obsoleted_packages()
+    # if removed_packages:
+    #    logger.info("Removed the following obsoleted packages:\n%s" % "\n".join(removed_packages))
+
+    print "\nChecking binary consistency with revdep-rebuild"
+    os.environ["HOME"] = home_dir
+    #os.system("/usr/bin/revdep-rebuild --force")
+    p = subprocess.Popen(["/usr/bin/revdep-rebuild", "--force"], stdout=subprocess.PIPE)
+    out, err = p.communicate()
+#    print "---\nout\n---%s---\n" % out
+#    print "---\nerr\n---%s---\n" % err
+
+    bgn_revdep_path = "%s/.revdep-rebuild" % home_dir
+    print bgn_revdep_path
+    with open("%s.3_rebuild" % bgn_revdep_path) as f:
+        rebuild = dict((l, p.strip().split(";")) for l, p in [line.split(":") for line in f.readlines()])
+    with open("%s.4_lnames" % bgn_revdep_path) as f:
+        lnames = dict((l, p.strip().split(";")) for l, p in [line.split(":") for line in f.readlines()])
+    with open("%s.4_rdnames" % bgn_revdep_path) as f:
+        rdnames = dict((l, p.strip().split(";")) for l, p in [line.split(":") for line in f.readlines()])
+
+    kept_packages = {}
+    for package_name, packages in sorted(built_packages.items()):
+        keep = None
+        binpkgnames = [os.path.basename(utils.get_package_name(pkg)) for pkg in packages[0]]
+        for pkgname, missing in missing_deps_packages.items():
+            if pkgname in binpkgnames:
+                keep = "missing dependencies:\n- %s" % ", ".join(missing)
+                break
+        for lib, pkg in lnames.items():
+            if keep: break
+            for pkgname in [p.split("-")[0] for p in pkg]:
+                if pkgname in binpkgnames:
+                    keep = "need to rebuild reverse dependencies:\n- %s" % ", ".join(rdnames[lib])
+                    break
+        if not keep:
+            move_packages(packages[0], packages[1], packages[2])
+        else:
+            kept_packages[package_name] = keep
+
+    if kept_packages:
+        print "Packages not moved to binary repo:"
+        for package_name, line in sorted(kept_packages.items()):
+            print "%s%s%s due to %s." % (RD, package_name, NO, line)
+        mailer.info("\n".join(["%s - %s" % (package_name, line) for package_name, line in sorted(kept_packages.items())]), "Packages not moved to binary repo.")
+            
 
     # Set index paths
     paths = [utils.get_compiled_packages_directory()]
@@ -140,14 +268,20 @@ def build_packages():
     # print "\nRunning hooks"""
     # utils.run_hooks()
 
-    # Check packages containing binaries and libraries broken by any package update
-    print "\nChecking binary consistency with revdep-rebuild"
-    os.environ["HOME"] = home_dir
-    os.system("/usr/bin/revdep-rebuild --force")
+    print "\nUpdating repositories"
+    os.system("pisi ur")
 
 def move_packages(new_binary_packages, new_debug_packages, new_delta_packages):
 
     def move_package(package, target):
+        package = os.path.basename(package)
+        name, version = pisi.util.parse_package_name(package)
+        if name.split("-").pop() in ["devel", "32bit", "doc", "docs", "userspace"]: name = name[:-1 - len(name.split("-").pop())]
+        if not options["f"] and os.path.isfile(os.path.join(target,
+                                                            name[0:4].lower() if name.startswith("lib") and len(name) > 3 else name.lower()[0],
+                                                            name.lower(),
+                                                            package)): return
+
         logger.info("Moving %s into %s" % (package, target))
         try:
             shutil.move(os.path.join(conf.workdir, package), target)
@@ -173,19 +307,23 @@ def move_packages(new_binary_packages, new_debug_packages, new_delta_packages):
         for pkg in new_delta_packages[package]:
             move_package(pkg, utils.get_compiled_debug_packages_directory())
 
-
 ### Entry point ###
 
 def handle_exception(exception, value, trace_back):
     string_io = cStringIO.StringIO()
     traceback.print_tb(trace_back, file = string_io)
     string_io.seek(0)
-
     logger.error(str(exception))
     logger.error(str(value))
     logger.error(string_io.read())
 
 if __name__ == "__main__":
+    options = {"b": False,    # resolv build deps only
+               "f": False,    # force to overwrite packages
+               "r": False     # use workqueue-release instead workqueue
+               }
+    args, options = utils.args_checker(sys.argv[1:], options)
+
     sys.excepthook = handle_exception
 
     # Check for available disk space, fail if any
