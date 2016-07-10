@@ -88,6 +88,10 @@ def send(msg, pspec = "", _type = "", subject=""):
 
     try:
         session = smtplib.SMTP(conf.smtpserver, timeout=10)
+        session.ehlo()
+        session.starttls()
+        session.ehlo
+
     except smtplib.SMTPConnectError:
         logger.error("Failed sending e-mail: Couldn't open session on %s." % conf.smtpserver)
         return
@@ -102,7 +106,7 @@ def send(msg, pspec = "", _type = "", subject=""):
         if _type == "announce":
             session.sendmail(conf.mailfrom, conf.announceaddr, message)
         else:
-            session.sendmail(conf.mailfrom, recipients_email + conf.cclist.split(","), message)
+            session.sendmail(conf.mailfrom, conf.cclist.split(","), message)
     except smtplib.SMTPException:
         logger.error("Failed sending e-mail: sendmail() raised an exception.")
 
