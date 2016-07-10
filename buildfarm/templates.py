@@ -13,7 +13,6 @@
 
 ERROR_MESSAGE = """\
 From: %(distribution)s %(release)s %(arch)s Buildfarm <%(mailFrom)s>
-To: %(mailTo)s
 Cc: %(ccList)s
 Subject: [%(subjectID)s] %(type)s: %(subject)s
 MIME-Version: 1.0
@@ -79,7 +78,6 @@ href="http://farm.pisilinux.org/farm-logs/%(logsdir)s/%(logfilename)s.html">http
 
 INFO_MESSAGE = """\
 From: %(distribution)s %(release)s %(arch)s Buildfarm <%(mailFrom)s>
-To: %(mailTo)s
 Cc: %(ccList)s
 Subject: [%(subjectID)s] %(subject)s
 Content-Type: text/plain;
@@ -97,7 +95,6 @@ This message is sent from Pisi Linux buildfarm. Please do not reply as it is aut
 
 CHECK_MESSAGE = """\
 From: %(distribution)s %(release)s %(arch)s Buildfarm <%(mailFrom)s>
-To: %(mailToUpdater)s
 Cc: %(ccList)s
 Subject: [%(subjectID)s] %(subject)s
 Content-Type: text/html;
