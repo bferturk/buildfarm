@@ -139,7 +139,7 @@ def build_packages():
                     qmgr.transferToWaitQueue(pspec)
         
                     # Cleanup possibly built .pisi packages
-                    utils.delete_pisi_files_from(conf.workdir)
+                    #utils.delete_pisi_files_from(conf.workdir)
         
                     errmsg = "Error occurred in package %s:\n %s" % (package_name_with_component, e)
                     logger.error(errmsg)
@@ -183,7 +183,7 @@ def build_packages():
                                     mailer.check("<BR>".join(out.split("\n")), pspec, "checkelf output for %s" % name)
                                     logger.info("Missing dependencies: %s" % ",".join(missing))
                                     missing_deps_packages[package_name] = missing
-                                    qmgr.transferToWaitQueue(pspec)
+                                   # qmgr.transferToWaitQueue(pspec)
                                 open(checkfile, "a" if os.path.exists(checkfile) else "w").write(out)
                 finally:
                     # Unmount tmp_dir if any
@@ -209,22 +209,22 @@ def build_packages():
     # if removed_packages:
     #    logger.info("Removed the following obsoleted packages:\n%s" % "\n".join(removed_packages))
 
-    print "\nChecking binary consistency with revdep-rebuild"
-    os.environ["HOME"] = home_dir
+  #  print "\nChecking binary consistency with revdep-rebuild"
+   # os.environ["HOME"] = home_dir
     #os.system("/usr/bin/revdep-rebuild --force")
-    p = subprocess.Popen(["/usr/bin/revdep-rebuild", "--force"], stdout=subprocess.PIPE)
-    out, err = p.communicate()
+    #p = subprocess.Popen(["/usr/bin/revdep-rebuild", "--force"], stdout=subprocess.PIPE)
+    #out, err = p.communicate()
 #    print "---\nout\n---%s---\n" % out
 #    print "---\nerr\n---%s---\n" % err
 
-    bgn_revdep_path = "%s/.revdep-rebuild" % home_dir
-    print bgn_revdep_path
-    with open("%s.3_rebuild" % bgn_revdep_path) as f:
-        rebuild = dict((l, p.strip().split(";")) for l, p in [line.split(":") for line in f.readlines()])
-    with open("%s.4_lnames" % bgn_revdep_path) as f:
-        lnames = dict((l, p.strip().split(";")) for l, p in [line.split(":") for line in f.readlines()])
-    with open("%s.4_rdnames" % bgn_revdep_path) as f:
-        rdnames = dict((l, p.strip().split(";")) for l, p in [line.split(":") for line in f.readlines()])
+    #bgn_revdep_path = "%s/.revdep-rebuild" % home_dir
+    #print bgn_revdep_path
+    #with open("%s.3_rebuild" % bgn_revdep_path) as f:
+    #    rebuild = dict((l, p.strip().split(";")) for l, p in [line.split(":") for line in f.readlines()])
+   # with open("%s.4_lnames" % bgn_revdep_path) as f:
+    #    lnames = dict((l, p.strip().split(";")) for l, p in [line.split(":") for line in f.readlines()])
+    #with open("%s.4_rdnames" % bgn_revdep_path) as f:
+     #   rdnames = dict((l, p.strip().split(";")) for l, p in [line.split(":") for line in f.readlines()])
 
     kept_packages = {}
     for package_name, packages in sorted(built_packages.items()):
@@ -233,23 +233,8 @@ def build_packages():
         for pkgname, missing in missing_deps_packages.items():
             if pkgname in binpkgnames:
                 keep = "missing dependencies:\n- %s" % ", ".join(missing)
-                break
-        for lib, pkg in lnames.items():
-            if keep: break
-            for pkgname in [p.split("-")[0] for p in pkg]:
-                if pkgname in binpkgnames:
-                    keep = "need to rebuild reverse dependencies:\n- %s" % ", ".join(rdnames[lib])
-                    break
-        if not keep:
-            move_packages(packages[0], packages[1], packages[2])
-        else:
-            kept_packages[package_name] = keep
+                move_packages(packages[0], packages[1], packages[2])
 
-    if kept_packages:
-        print "Packages not moved to binary repo:"
-        for package_name, line in sorted(kept_packages.items()):
-            print "%s%s%s due to %s." % (RD, package_name, NO, line)
-        mailer.info("\n".join(["%s - %s" % (package_name, line) for package_name, line in sorted(kept_packages.items())]), "Packages not moved to binary repo.")
             
 
     # Set index paths
