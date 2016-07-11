@@ -180,7 +180,7 @@ def build_packages():
                                         continue 
                                     missing_index = chline.find("Missing dependencies")
                                 if missing:
-                                    mailer.check("<BR>".join(out.split("\n")), pspec, "checkelf output for %s" % name)
+                                    mailer.check("<BR>".join(out.split("\n")), pspec, "checkelf output for %s" % package_name_with_component)
                                     logger.info("Missing dependencies: %s" % ",".join(missing))
                                     missing_deps_packages[package_name] = missing
                                    # qmgr.transferToWaitQueue(pspec)
