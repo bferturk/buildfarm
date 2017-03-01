@@ -257,18 +257,12 @@ class Index(xmlfile.XmlFile):
     t_Groups = [ [group.Group], autoxml.optional, "Group"]
 
     def index(self, specs):
-        pool = multiprocessing.Pool()
 
         if specs:
             try:
-                self.specs = pool.map(add_spec, specs)
+                self.specs = map(add_spec, specs)
             except KeyboardInterrupt:
-                pool.terminate()
-                pool.join()
                 raise Exception
-
-        pool.close()
-        pool.join()
 
 def add_spec(path):
     try:
