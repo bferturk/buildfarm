@@ -36,6 +36,7 @@ class PisiApi:
         self.options.ignore_check = conf.ignorecheck
         self.options.ignore_sandbox = False
 
+        pisi.api.set_comar(False)
         # Set API options
         pisi.api.set_options(self.options)
 
